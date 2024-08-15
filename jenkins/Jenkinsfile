@@ -1,0 +1,61 @@
+pipeline {
+    agent any
+    stages
+        stage('Preparing') {
+            steps {
+                sh 'echo Preparing'
+            }
+        }
+        stage('Checkout SCM'){
+            steps{
+                script{
+                    checkout scmGit(branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/yeshwanthlm/EKS-Terraform-Jenkins.git']])
+                }
+            }
+        }
+        stage('Initializing Terraform'){
+            steps{
+                script{
+                    dir('terraform'){
+                         withAWS(credentials: 'aws-creds', region: 'us-east-1') {
+                sh 'terraform init'
+                }
+                    }
+                }
+            }
+        }
+        stage('Validating Terraform'){
+            steps{
+                script{
+                    dir('terraform'){
+                         withAWS(credentials: 'aws-creds', region: 'us-east-1') {
+                sh 'terraform validate'
+                }
+                    }
+                }
+            }
+        }
+        stage('Previewing the infrastructure'){
+            steps{
+                script{
+                    dir('terraform'){
+                         withAWS(credentials: 'aws-creds', region: 'us-east-1') {
+                sh 'terraform plan'
+                }
+                    }
+                    input(message: "Approve?", ok: "proceed")
+                }
+            }
+        }
+        stage('Create/Destroy an EKS cluster'){
+            steps{
+                script{
+                    dir('terraform'){
+                        withAWS(credentials: 'aws-creds', region: 'us-east-1') {
+                sh 'terraform $action --auto-approve'
+                }
+                    }
+                }
+            }
+        }
+    }
